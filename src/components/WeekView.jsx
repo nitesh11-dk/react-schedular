@@ -6,6 +6,7 @@ const WeekView = ({ onSlotClick, onTaskClick }) => {
   const { getTasksByDate, deleteTask } = useTaskContext();
   const [hoveredTask, setHoveredTask] = useState(null);
   const calendarRef = useRef(null);
+  const hoverTimeoutRef = useRef(null);
 
   const getWeekDays = (date) => {
     const start = new Date(date);
@@ -57,20 +58,23 @@ const WeekView = ({ onSlotClick, onTaskClick }) => {
   };
 
   const handleTimeSlotClick = (date, hour, e) => {
-    // Create a new date object to avoid modifying the original
     const selectedDate = new Date(date.getTime());
-    
-    // Set the hours directly, this ensures proper handling of day transitions
     selectedDate.setHours(hour);
     selectedDate.setMinutes(0);
     selectedDate.setSeconds(0);
     selectedDate.setMilliseconds(0);
-    
     onSlotClick(selectedDate, e);
   };
 
   const handleTaskHover = (e, task, isEnter) => {
     e.stopPropagation();
+    
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+
     if (isEnter) {
       const taskElement = e.currentTarget;
       const rect = taskElement.getBoundingClientRect();
@@ -97,8 +101,25 @@ const WeekView = ({ onSlotClick, onTaskClick }) => {
         position: { left, top }
       });
     } else {
-      e.currentTarget.style.zIndex = '';
-      setHoveredTask(null);
+      // Add a small delay before hiding the tooltip
+      hoverTimeoutRef.current = setTimeout(() => {
+        e.currentTarget.style.zIndex = '';
+        setHoveredTask(null);
+      }, 50); // 300ms delay
+    }
+  };
+
+  const handleTooltipHover = (isEnter) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    
+    if (!isEnter) {
+      // Only hide after a delay when leaving the tooltip
+      hoverTimeoutRef.current = setTimeout(() => {
+        setHoveredTask(null);
+          }, 50);
     }
   };
 
@@ -184,6 +205,8 @@ const WeekView = ({ onSlotClick, onTaskClick }) => {
             left: `${hoveredTask.position.left}px`,
             top: `${hoveredTask.position.top}px`
           }}
+          onMouseEnter={() => handleTooltipHover(true)}
+          onMouseLeave={() => handleTooltipHover(false)}
         >
           {(() => {
             const task = getTasksByDate(weekDays[0]).find(t => t.id === hoveredTask.id) ||

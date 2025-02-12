@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTaskContext } from '../context/TaskContext';
 
 const MonthView = ({ onDateClick, onTaskClick }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const { getTasksByDate, deleteTask } = useTaskContext();
   const [hoveredTask, setHoveredTask] = useState(null);
+  const hoverTimeoutRef = useRef(null);
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -53,6 +54,63 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
     selectedDate.setHours(10, 0, 0, 0);
     
     onDateClick(selectedDate, e);
+  };
+
+  const handleTaskHover = (e, task, isEnter) => {
+    e.stopPropagation();
+    
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+
+    if (isEnter) {
+      const taskElement = e.currentTarget;
+      const rect = taskElement.getBoundingClientRect();
+      const tooltipWidth = 192; // w-48 = 12rem = 192px
+      
+      // Position the tooltip relative to the task element
+      let left = rect.left;
+      let top = rect.bottom + 4; // 4px gap
+      
+      // Check if tooltip would go off the right edge of the screen
+      if (left + tooltipWidth > window.innerWidth) {
+        left = window.innerWidth - tooltipWidth - 16; // 16px padding
+      }
+      
+      // Check if tooltip would go off the bottom of the screen
+      const tooltipHeight = 150; // Approximate height of tooltip
+      if (top + tooltipHeight > window.innerHeight) {
+        top = rect.top - tooltipHeight - 4; // Position above the task
+      }
+      
+      taskElement.style.zIndex = '50';
+      setHoveredTask({
+        id: task.id,
+        position: { left, top }
+      });
+    } else {
+      // Add a small delay before hiding the tooltip
+      hoverTimeoutRef.current = setTimeout(() => {
+        e.currentTarget.style.zIndex = '';
+        setHoveredTask(null);
+      }, 50);
+    }
+  };
+
+  const handleTooltipHover = (isEnter) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    
+    if (!isEnter) {
+      // Only hide after a delay when leaving the tooltip
+      hoverTimeoutRef.current = setTimeout(() => {
+        setHoveredTask(null);
+      }, 50);
+    }
   };
 
   return (
@@ -105,46 +163,17 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
                   {getTasksByDate(day).map(task => (
                     <div
                       key={task.id}
-                      className={`relative group ${task.bgColor} text-white text-xs p-1 mb-1 rounded hover:ring-2 hover:ring-white hover:shadow-lg transition-all duration-150`}
+                      className={`relative group cursor-pointer ${task.bgColor} text-white text-xs p-1 mb-1 rounded hover:ring-2 hover:ring-white hover:shadow-lg transition-all duration-150`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onTaskClick(task, e);
                       }}
-                      onMouseEnter={() => setHoveredTask(task.id)}
-                      onMouseLeave={() => setHoveredTask(null)}
+                      onMouseEnter={(e) => handleTaskHover(e, task, true)}
+                      onMouseLeave={(e) => handleTaskHover(e, task, false)}
                     >
                       <div className="truncate">
                         {formatTime(task.time)} {task.title}
                       </div>
-                      
-                      {/* Task Details Tooltip */}
-                      {hoveredTask === task.id && (
-                        <div className="absolute left-0 top-full mt-1 bg-gray-800 text-white p-2 rounded shadow-lg z-50 w-48">
-                          <div className="font-medium mb-1">{task.title}</div>
-                          <div className="text-gray-300 text-xs mb-2">{task.description}</div>
-                          <div className="text-gray-300 text-xs">{formatTime(task.time)}</div>
-                          <div className="flex justify-end space-x-2 mt-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onTaskClick(task, e);
-                              }}
-                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition-colors duration-150"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteTask(task.id);
-                              }}
-                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition-colors duration-150"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -153,6 +182,54 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
           </div>
         ))}
       </div>
+
+      {/* Tooltip Portal */}
+      {hoveredTask && (
+        <div 
+          className="fixed bg-gray-800 text-white p-2 rounded shadow-lg z-[100] w-48"
+          style={{
+            left: `${hoveredTask.position.left}px`,
+            top: `${hoveredTask.position.top}px`
+          }}
+          onMouseEnter={() => handleTooltipHover(true)}
+          onMouseLeave={() => handleTooltipHover(false)}
+        >
+          {(() => {
+            const task = days.reduce((found, day) => 
+              found || (day && getTasksByDate(day).find(t => t.id === hoveredTask.id)), null);
+            
+            return task ? (
+              <>
+                <div className="font-medium mb-1">{task.title}</div>
+                <div className="text-gray-300 text-xs mb-2">{task.description}</div>
+                <div className="text-gray-300 text-xs">{formatTime(task.time)}</div>
+                <div className="flex justify-end space-x-2 mt-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTaskClick(task, e);
+                    }}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition-colors duration-150"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm('Are you sure you want to delete this task?')) {
+                        deleteTask(task.id);
+                      }
+                    }}
+                    className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition-colors duration-150"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            ) : null
+          })()}
+        </div>
+      )}
     </div>
   );
 };
