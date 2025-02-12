@@ -6,10 +6,18 @@ const TaskContext = createContext();
 const initialTasks = [
   {
     id: uuidv4(),
+    title: 'Team Meeting-45',
+    description: 'Weekly sync with the development team',
+    date: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString(),
+    time: '11:00',
+    bgColor: 'bg-green-500'
+  },
+  {
+    id: uuidv4(),
     title: 'Team Meeting',
     description: 'Weekly sync with the development team',
     date: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(),
-    time: '10:00',
+    time: '11:00',
     bgColor: 'bg-blue-500'
   },
   {
