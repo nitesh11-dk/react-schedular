@@ -37,8 +37,22 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
-  const handleTaskClick = (e, task) => {
-    e.stopPropagation();
+  const formatTime = (time) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+  };
+
+  const handleDateClick = (day, e) => {
+    if (!day) return;
+    
+    // Create a new date at 10 AM on the clicked day
+    const selectedDate = new Date(day);
+    selectedDate.setHours(10, 0, 0, 0);
+    
+    onDateClick(selectedDate, e);
   };
 
   return (
@@ -76,7 +90,7 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
             className={`min-h-[100px] p-1 border border-gray-800 ${
               day ? 'cursor-pointer hover:bg-gray-800' : 'bg-gray-900'
             }`}
-            onClick={(e) => day && onDateClick(day, e)}
+            onClick={(e) => handleDateClick(day, e)}
           >
             {day && (
               <>
@@ -91,13 +105,16 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
                   {getTasksByDate(day).map(task => (
                     <div
                       key={task.id}
-                      className={`relative group ${task.bgColor} text-white text-xs p-1 mb-1 rounded`}
-                      onClick={(e) => handleTaskClick(e, task)}
+                      className={`relative group ${task.bgColor} text-white text-xs p-1 mb-1 rounded hover:ring-2 hover:ring-white hover:shadow-lg transition-all duration-150`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTaskClick(task, e);
+                      }}
                       onMouseEnter={() => setHoveredTask(task.id)}
                       onMouseLeave={() => setHoveredTask(null)}
                     >
                       <div className="truncate">
-                        {task.time} {task.title}
+                        {formatTime(task.time)} {task.title}
                       </div>
                       
                       {/* Task Details Tooltip */}
@@ -105,14 +122,14 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
                         <div className="absolute left-0 top-full mt-1 bg-gray-800 text-white p-2 rounded shadow-lg z-50 w-48">
                           <div className="font-medium mb-1">{task.title}</div>
                           <div className="text-gray-300 text-xs mb-2">{task.description}</div>
-                          <div className="text-gray-300 text-xs">{task.time}</div>
+                          <div className="text-gray-300 text-xs">{formatTime(task.time)}</div>
                           <div className="flex justify-end space-x-2 mt-2">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onTaskClick(task, e);
                               }}
-                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition-colors duration-150"
                             >
                               Edit
                             </button>
@@ -121,7 +138,7 @@ const MonthView = ({ onDateClick, onTaskClick }) => {
                                 e.stopPropagation();
                                 deleteTask(task.id);
                               }}
-                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
+                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition-colors duration-150"
                             >
                               Delete
                             </button>
